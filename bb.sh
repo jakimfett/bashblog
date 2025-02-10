@@ -28,34 +28,13 @@ global_variables() {
 
     # Your name
     global_author="John Smith"
-    # You can use twitter or facebook or anything for global_author_url
-    global_author_url="http://twitter.com/example" 
+    # You can use bluesky or facebook or anything for global_author_url
+    global_author_url="http://bsky.app/profile/example" 
     # Your email
     global_email="john@smith.com"
 
     # CC by-nc-nd is a good starting point, you can change this to "&copy;" for Copyright
     global_license="CC by-nc-nd"
-
-    # If you have a Google Analytics ID (UA-XXXXX) and wish to use the standard
-    # embedding code, put it on global_analytics
-    # If you have custom analytics code (i.e. non-google) or want to use the Universal
-    # code, leave global_analytics empty and specify a global_analytics_file
-    global_analytics=""
-    global_analytics_file=""
-
-    # Leave this empty (i.e. "") if you don't want to use feedburner, 
-    # or change it to your own URL
-    global_feedburner=""
-
-    # Change this to your username if you want to use twitter for comments
-    global_twitter_username=""
-    # Default image for the Twitter cards. Use an absolute URL
-    global_twitter_card_image=""
-    # Set this to false for a Twitter button with share count. The cookieless version
-    # is just a link.
-    global_twitter_cookieless="true"
-    # Default search page, where tweets more than a week old are hidden
-    global_twitter_search="twitter"
 
     # Change this to your disqus username to use disqus for comments
     global_disqus_username=""
@@ -75,8 +54,9 @@ global_variables() {
 
     # site map file
     blog_sitemap="sitemap.xml"
-    # feed file (rss in this case)
-    blog_feed="feed.rss"
+    # feed files (rss and json in this case)
+    feed_rss="feed.rss"
+    feed_json="feed.json"
     number_of_feed_articles="10"
     # "cut" blog entry when putting it to index page. Leave blank for full articles in front page
     # i.e. include only up to first '<hr>', or '----' in markdown
@@ -92,9 +72,10 @@ global_variables() {
     # please make sure that no other html file starts with this prefix
     prefix_tags="tag_"
     # personalized header and footer (only if you know what you're doing)
-    # DO NOT name them .header.html, .footer.html or they will be overwritten
+    # DO NOT name them .header.html, .title.html, .footer.html or they will be overwritten
     # leave blank to generate them, recommended
     header_file=""
+    title_file=""
     footer_file=""
     # extra content to add just after we open the <body> tag
     # and before the actual blog content
@@ -104,15 +85,17 @@ global_variables() {
     # extra content to ONLY on the index page AFTER `body_begin_file` contents
     # and before the actual content
     body_begin_file_index=""
-    # CSS files to include on every page, f.ex. css_include=('main.css' 'blog.css')
+    # CSS files to include on every page, f.ex. css_include=('main.css')
     # leave empty to use generated
     css_include=()
     # HTML files to exclude from index, f.ex. post_exclude=('imprint.html 'aboutme.html')
     html_exclude=()
+    # add specific favicon
+    # a favicon is used as logo/icon the blog in the browser
+    # use the realtiv path to it and it must be an .ico file
+    favicon=""
 
     # Localization and i18n
-    # "Comments?" (used in twitter link after every post)
-    template_comments="Comments?"
     # "Read more..." (link under cut article on index page)
     template_read_more="Read more..."
     # "View more posts" (used on bottom of index page as link to archive)
@@ -131,13 +114,12 @@ global_variables() {
     template_tags_line_header="Tags:"
     # "Back to the index page" (used on archive page, it is link to blog index)
     template_archive_index_page="Back to the index page"
-    # "Subscribe" (used on bottom of index page, it is link to RSS feed)
-    template_subscribe="Subscribe"
+    # "RSS" and "JSON" (used on bottom of index page, it is links to RSS and JSON feed)
+    template_subscribe_rss="RSS"
+    template_subscribe_json="JSON"
     # "Subscribe to this page..." (used as text for browser feed button that is embedded to html)
-    template_subscribe_browser_button="Subscribe to this page..."
-    # "Tweet" (used as twitter text button for posting to twitter)
-    template_twitter_button="Tweet"
-    template_twitter_comment="&lt;Type your comment here but please leave the URL so that other people can follow the comments&gt;"
+    template_subscribe_rss_browser_button="Subscribe to this page's RSS Feed.'"
+    template_subscribe_json_browser_button="Subscribe to this page's JSON Feed.'"
     
     # The locale to use for the dates displayed on screen
     date_format="%B %d, %Y"
@@ -145,6 +127,7 @@ global_variables() {
     date_inpost="bashblog_timestamp"
     # Don't change these dates
     date_format_full="%a, %d %b %Y %H:%M:%S %z"
+    date_format_json="%Y-%m-%dT%T%:z"
     date_format_timestamp="%Y%m%d%H%M.%S"
     date_allposts_header="%B %Y"
     # Data format for sitemap
@@ -154,7 +137,8 @@ global_variables() {
     # Experts only. You may need to tune the locales too
     # Leave empty for no conversion, which is not recommended
     # This default filter respects backwards compatibility
-    convert_filename="iconv -f utf-8 -t ascii//translit | sed 's/^-*//' | tr [:upper:] [:lower:] | tr ' ' '-' | tr -dc '[:alnum:]-'"
+    # Date in Format `yyyy-mm-dd` is prefixed to the file name
+    convert_filename="date +%F | tr -d '\n' && echo -n '-' && iconv -f utf-8 -t ascii//translit | sed 's/^-*//' | tr [:upper:] [:lower:] | tr ' ' '-' | tr -dc '[:alnum:]-'"
 
     # URL where you can view the post while it's being edited
     # same as global_url by default
@@ -195,30 +179,6 @@ markdown() {
     while [[ -f $out ]]; do out=${out%.html}.$RANDOM.html; done
     $markdown_bin "$1" > "$out"
     echo "$out"
-}
-
-
-# Prints the required google analytics code
-google_analytics() {
-    [[ -z $global_analytics && -z $global_analytics_file ]]  && return
-
-    if [[ -z $global_analytics_file ]]; then
-        echo "<script type=\"text/javascript\">
-
-        var _gaq = _gaq || [];
-        _gaq.push(['_setAccount', '${global_analytics}']);
-        _gaq.push(['_trackPageview']);
-
-        (function() {
-        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-        })();
-
-        </script>"
-    else
-        cat "$global_analytics_file"
-    fi
 }
 
 # Prints the required code for disqus comments
@@ -339,61 +299,7 @@ edit() {
     fi
 }
 
-# Create a Twitter summary (twitter "card") for the post
-#
-# $1 the post file
-# $2 the title
-twitter_card() {
-    [[ -z $global_twitter_username ]] && return
-    
 
-    echo "<meta name='twitter:card' content='summary'>"
-    echo "<meta name='twitter:site' content='@$global_twitter_username'>"
-    echo "<meta name='twitter:title' content='$2'>" # Twitter truncates at 70 char
-    description=$(grep -v "^<p>$template_tags_line_header" "$1" | sed -e 's/<[^>]*>//g' | tr '\n' ' ' | sed "s/\"/'/g" | head -c 250) 
-    echo "<meta name='twitter:description' content=\"$description\">"
-
-    # For the image we try to locate the first image in the article
-    image=$(sed -n '2,$ d; s/.*<img.*src="\([^"]*\)".*/\1/p' "$1") 
-
-    # If none, then we try a global setting image
-    [[ -z $image ]] && [[ -n $global_twitter_card_image ]] && image=$global_twitter_card_image
-
-    # If none, return
-    [[ -z $image ]] && return
-
-    # Final housekeeping
-    [[ $image =~ ^https?:// ]] || image=$global_url/$image # Check that URL is absolute
-    echo "<meta name='twitter:image' content='$image'>"
-}
-
-# Adds the code needed by the twitter button
-#
-# $1 the post URL
-twitter() {
-    [[ -z $global_twitter_username ]] && return
-
-    if [[ -z $global_disqus_username ]]; then
-        if [[ $global_twitter_cookieless == true ]]; then 
-            id=$RANDOM
-
-            search_engine="https://twitter.com/search?q="
-
-            echo "<p id='twitter'><a href='http://twitter.com/intent/tweet?url=$1&text=$template_twitter_comment&via=$global_twitter_username'>$template_comments $template_twitter_button</a> "
-            echo "<a href='$search_engine""$1'><span id='count-$id'></span></a>&nbsp;</p>"
-            return;
-        else 
-            echo "<p id='twitter'>$template_comments&nbsp;"; 
-        fi
-    else
-        echo "<p id='twitter'><a href=\"$1#disqus_thread\">$template_comments</a> &nbsp;"
-    fi  
-
-    echo "<a href=\"https://twitter.com/share\" class=\"twitter-share-button\" data-text=\"$template_twitter_comment\" data-url=\"$1\""
-    echo " data-via=\"$global_twitter_username\""
-    echo ">$template_twitter_button</a>	<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=\"//platform.twitter.com/widgets.js\";fjs.parentNode.insertBefore(js,fjs);}}(document,\"script\",\"twitter-wjs\");</script>"
-    echo "</p>"
-}
 
 # Check if the file is a 'boilerplate' (i.e. not a post)
 # The return values are designed to be used like this inside a loop:
@@ -411,7 +317,7 @@ is_boilerplate_file() {
     done
 
     case $name in
-    ( "$index_file" | "$archive_index" | "$tags_index" | "$footer_file" | "$header_file" | "$global_analytics_file" | "$prefix_tags"* )
+    ( "$index_file" | "$archive_index" | "$tags_index" | "$footer_file" | "$header_file" | "$title_file" | "$global_analytics_file" | "$prefix_tags"* )
         return 0 ;;
     ( * ) # Check for excluded
         for excl in "${html_exclude[@]}"; do
@@ -446,32 +352,29 @@ create_html_page() {
     {
         cat ".header.html"
         echo "<title>$title</title>"
-        google_analytics
-        twitter_card "$content" "$title"
         echo "</head><body>"
         # stuff to add before the actual body content
         [[ -n $body_begin_file ]] && cat "$body_begin_file"
         [[ $filename = $index_file* ]] && [[ -n $body_begin_file_index ]] && cat "$body_begin_file_index"
         # body divs
-        echo '<div id="divbodyholder">'
-        echo '<div class="headerholder"><div class="header">'
+        echo '<header>'
         # blog title
-        echo '<div id="title">'
         cat .title.html
-        echo '</div></div></div>' # title, header, headerholder
-        echo '<div id="divbody"><div class="content">'
+        echo '</header>' # title, header, headerholder
+        echo '<main>'
 
         file_url=${filename#./}
         file_url=${file_url%.rebuilt} # Get the correct URL when rebuilding
         # one blog entry
         if [[ $index == no ]]; then
             echo '<!-- entry begin -->' # marks the beginning of the whole post
-            echo "<h3><a class=\"ablack\" href=\"$file_url\">"
+            echo '<article>'
+            echo "<h2><a href=\"$file_url\">"
             # remove possible <p>'s on the title because of markdown conversion
             title=${title//<p>/}
             title=${title//<\/p>/}
             echo "$title"
-            echo '</a></h3>'
+            echo '</a></h2>'
             if [[ -z $timestamp ]]; then
                 echo "<!-- $date_inpost: #$(LC_ALL=$date_locale date +"$date_format_timestamp")# -->"
             else
@@ -482,28 +385,27 @@ create_html_page() {
             else
                 echo -n "<div class=\"subtitle\">$(LC_ALL=$date_locale date +"$date_format" --date="$timestamp")"
             fi
-            [[ -n $author ]] && echo -e " &mdash; \n$author"
+            [[ -n $author ]] && echo -e " &ndash; \n$author"
             echo "</div>"
             echo '<!-- text begin -->' # This marks the text body, after the title, date...
         fi
         cat "$content" # Actual content
         if [[ $index == no ]]; then
             echo -e '\n<!-- text end -->'
-
-            twitter "$global_url/$file_url"
-
+            echo '</article>'
             echo '<!-- entry end -->' # absolute end of the post
         fi
 
-        echo '</div>' # content
-
         # Add disqus commments except for index and all_posts pages
         [[ $index == no ]] && disqus_body
+        
+        echo '</main>' 
 
         # page footer
+        echo "<footer>"
         cat .footer.html
+        echo "</footer>"
         # close divs
-        echo '</div></div>' # divbody and divbodyholder 
         disqus_footer
         [[ -n $body_end_file ]] && cat "$body_end_file"
         echo '</body></html>'
@@ -678,8 +580,11 @@ all_posts() {
     done
 
     {
-        echo "<h3>$template_archive_title</h3>"
+        echo "<article>"
+        echo "<h2>$template_archive_title</h2>"
         prev_month=""
+        tmpfile=$(mktemp)
+        list_html_by_timestamp > "$tmpfile"
         while IFS='' read -r i; do
             is_boilerplate_file "$i" && continue
             echo -n "." 1>&3
@@ -690,23 +595,27 @@ all_posts() {
             month=$(LC_ALL=$date_locale date -r "$i" +"$date_allposts_header")
             if [[ $month != "$prev_month" ]]; then
                 [[ -n $prev_month ]] && echo "</ul>"  # Don't close ul before first header
-                echo "<h4 class='allposts_header'>$month</h4>"
+                echo "<h3 class='allposts_header'>$month</h3>"
                 echo "<ul>"
                 prev_month=$month
             fi
             # Title
             title=$(get_post_title "$i")
-            echo -n "<li><a href=\"$i\">$title</a> &mdash;"
+            echo -n "<li><a href=\"$i\">$title</a> &ndash;"
             # Date
             date=$(LC_ALL=$date_locale date -r "$i" +"$date_format")
             echo " $date</li>"
-        done < <(list_html_by_timestamp)
+        done < "$tmpfile"
+        rm "$tmpfile"
         echo "" 1>&3
         echo "</ul>"
-        echo "<div id=\"all_posts\"><a href=\"./$index_file\">$template_archive_index_page</a></div>"
+        echo "</article>"
+        echo "<section class=\"subnav\">"
+        echo "<div class=\"subnav\"><a href=\"./$index_file\">$template_archive_index_page</a></div>"
+        echo "</section>"
     } 3>&1 >"$contentfile"
 
-    create_html_page "$contentfile" "$archive_index.tmp" yes "$global_title &mdash; $template_archive_title" "$global_author"
+    create_html_page "$contentfile" "$archive_index.tmp" yes "$global_title &ndash; $template_archive_title" "$global_author"
     mv "$archive_index.tmp" "$archive_index"
     chmod 644 "$archive_index"
     rm "$contentfile"
@@ -721,7 +630,8 @@ all_tags() {
     done
 
     {
-        echo "<h3>$template_tags_title</h3>"
+        echo "<article>"
+        echo "<h2>$template_tags_title</h2>"
         echo "<ul>"
         for i in $prefix_tags*.html; do
             [[ -f "$i" ]] || break
@@ -734,14 +644,17 @@ all_tags() {
                 2|3|4) word=$template_tags_posts_2_4;;
                 *) word=$template_tags_posts;;
             esac
-            echo "<li><a href=\"$i\">$tagname</a> &mdash; $nposts $word</li>"
+            echo "<li><a href=\"$i\">$tagname</a> &ndash; $nposts $word</li>"
         done
         echo "" 1>&3
         echo "</ul>"
-        echo "<div id=\"all_posts\"><a href=\"./$index_file\">$template_archive_index_page</a></div>"
+        echo "</article>"
+        echo "<section class=\"subnav\">"
+        echo "<div class=\"subnav\"><a href=\"./$index_file\">$template_archive_index_page</a></div>"
+        echo "</section>"
     } 3>&1 > "$contentfile"
 
-    create_html_page "$contentfile" "$tags_index.tmp" yes "$global_title &mdash; $template_tags_title" "$global_author"
+    create_html_page "$contentfile" "$tags_index.tmp" yes "$global_title &ndash; $template_tags_title" "$global_author"
     mv "$tags_index.tmp" "$tags_index"
     chmod 644 "$tags_index"
     rm "$contentfile"
@@ -760,6 +673,8 @@ rebuild_index() {
     # Create the content file
     {
         n=0
+        tmpfile=$(mktemp)
+        list_html_by_timestamp > "$tmpfile"
         while IFS='' read -r i; do
             is_boilerplate_file "$i" && continue;
             if ((n >= number_of_index_articles)); then break; fi
@@ -770,11 +685,14 @@ rebuild_index() {
             fi
             echo -n "." 1>&3
             n=$(( n + 1 ))
-        done < <(list_html_by_timestamp) # sort by file timestamp, newest first
+        done < "$tmpfile"
+        rm "$tmpfile"
 
-        feed=$blog_feed
-        if [[ -n $global_feedburner ]]; then feed=$global_feedburner; fi
-        echo "<div id=\"all_posts\"><a href=\"$archive_index\">$template_archive</a> &mdash; <a href=\"$tags_index\">$template_tags_title</a> &mdash; <a href=\"$feed\">$template_subscribe</a></div>"
+        rss=$feed_rss
+        json=$feed_json
+        echo "<section>"
+        echo "<div class=\"subnav\"><a href=\"$archive_index\">$template_archive</a> &ndash; <a href=\"$tags_index\">$template_tags_title</a> &ndash; <a href=\"$rss\">$template_subscribe_rss</a> &ndash; <a href=\"$json\">$template_subscribe_json</a></div>"
+        echo "</section>"
     } 3>&1 >"$contentfile"
 
     echo ""
@@ -799,7 +717,7 @@ posts_with_tags() {
     (($# < 1)) && return
     set -- "${@/#/$prefix_tags}"
     set -- "${@/%/.html}"
-    sed -n '/^<h3><a class="ablack" href="[^"]*">/{s/.*href="\([^"]*\)">.*/\1/;p;}' "$@" 2> /dev/null
+    sed -n '/^<h2><a href="[^"]*">/{s/.*href="\([^"]*\)">.*/\1/;p;}' "$@" 2> /dev/null
 }
 
 # Rebuilds tag_*.html files
@@ -851,12 +769,15 @@ rebuild_tags() {
     done <<< "$files"
     rm "$tmpfile"
     # Now generate the tag files with headers, footers, etc
+    tmpfile=$(mktemp)
+    ls -t ./"$prefix_tags"*.tmp.html 2>/dev/null > "$tmpfile"
     while IFS='' read -r i; do
         tagname=${i#./"$prefix_tags"}
         tagname=${tagname%.tmp.html}
-        create_html_page "$i" "$prefix_tags$tagname.html" yes "$global_title &mdash; $template_tag_title \"$tagname\"" "$global_author"
+        create_html_page "$i" "$prefix_tags$tagname.html" yes "$global_title &ndash; $template_tag_title \"$tagname\"" "$global_author"
         rm "$i"
-    done < <(ls -t ./"$prefix_tags"*.tmp.html 2>/dev/null)
+    done < "$tmpfile"
+    rm "$tmpfile"
     echo
 }
 
@@ -864,7 +785,7 @@ rebuild_tags() {
 #
 # $1 the html file
 get_post_title() {
-    awk '/<h3><a class="ablack" href=".+">/, /<\/a><\/h3>/{if (!/<h3><a class="ablack" href=".+">/ && !/<\/a><\/h3>/) print}' "$1"
+    awk '/<h2><a href=".+">/, /<\/a><\/h2>/{if (!/<h2><a href=".+">/ && !/<\/a><\/h2>/) print}' "$1"
 }
 
 # Return the post author
@@ -908,12 +829,15 @@ list_posts() {
 
     lines=""
     n=1
-    while IFS='' read -r i; do
+    tmpfile=$(mktemp)
+    ls -t ./*.html > "$tmpfile"
+    while IFS='' read -r line; do
         is_boilerplate_file "$i" && continue
         line="$n # $(get_post_title "$i") # $(LC_ALL=$date_locale date -r "$i" +"$date_format")"
         lines+=$line\\n
         n=$(( n + 1 ))
-    done < <(ls -t ./*.html)
+    done < "$tmpfile"
+    rm "$tmpfile"
 
     echo -e "$lines" | column -t -s "#"
 }
@@ -931,13 +855,16 @@ make_sitemap() {
         echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
         echo "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"
         echo -n "." 1>&3
+        tmpfile=$(mktemp)
+        ls -t ./*.html > "$tmpfile"
         while IFS='' read -r i; do
             echo -n "." 1>&3
             echo "<url>"
             echo "<loc>$global_url/${i#./}</loc>"
             echo "<lastmod>$(LC_ALL=C date -r "$i" +"$date_format_sitemap")</lastmod>"
             echo "</url>"
-        done < <(ls -t ./*.html)
+        done < "$tmpfile"
+        rm "$tmpfile"
 
         echo "</urlset>"
     } 3>&1 >"$sitemapfile"
@@ -951,8 +878,8 @@ make_sitemap() {
 make_rss() {
     echo -n "Making RSS "
 
-    rssfile=$blog_feed.$RANDOM
-    while [[ -f $rssfile ]]; do rssfile=$blog_feed.$RANDOM; done
+    rssfile=$feed_rss.$RANDOM
+    while [[ -f $rssfile ]]; do rssfile=$feed_rss.$RANDOM; done
 
     {
         pubdate=$(LC_ALL=C date +"$date_format_full")
@@ -962,9 +889,11 @@ make_rss() {
         echo "<description>$global_description</description><language>en</language>"
         echo "<lastBuildDate>$pubdate</lastBuildDate>"
         echo "<pubDate>$pubdate</pubDate>"
-        echo "<atom:link href=\"$global_url/$blog_feed\" rel=\"self\" type=\"application/rss+xml\" />"
+        echo "<atom:link href=\"$global_url/$feed_rss\" rel=\"self\" type=\"application/rss+xml\" />"
     
         n=0
+        tmpfile=$(mktemp)
+        ls -t ./*.html > "$tmpfile"
         while IFS='' read -r i; do
             is_boilerplate_file "$i" && continue
             ((n >= number_of_feed_articles)) && break # max 10 items
@@ -979,22 +908,77 @@ make_rss() {
             echo "<pubDate>$(LC_ALL=C date -r "$i" +"$date_format_full")</pubDate></item>"
     
             n=$(( n + 1 ))
-        done < <(ls -t ./*.html)
+        done < "$tmpfile"
+        rm "$tmpfile"
     
         echo '</channel></rss>'
     } 3>&1 >"$rssfile"
     echo ""
 
-    mv "$rssfile" "$blog_feed"
-    chmod 644 "$blog_feed"
+    mv "$rssfile" "$feed_rss"
+    chmod 644 "$feed_rss"
+}
+
+# Generate the json feed file
+make_json() {
+    echo -n "Making JSON Feed "
+
+    jsonfile=$feed_json.$RANDOM
+    while [[ -f $jsonfile ]]; do jsonfile=$feed_json.$RANDOM; done
+
+    {
+        # pubdate=$(LC_ALL=C date +"$date_format_json")
+        echo '{'
+        echo '"version": "https://jsonfeed.org/version/1.1",' 
+        echo '"title": "'${global_title}'",'
+        echo '"home_page_url": "'$global_url/$index_file'",'
+        echo '"feed_url": "'$global_url/$feed_json'",'
+        echo '"description": "'$global_description'",'
+        echo '"author": {'
+        echo '"name": "'$global_author'"'
+        echo '},'
+        echo '"language": "de",'
+        echo '"items": ['
+    
+        n=0
+        tmpfile=$(mktemp)
+        ls -t ./*.html > "$tmpfile"
+        while IFS='' read -r i; do
+            is_boilerplate_file "$i" && continue
+            ((n >= number_of_feed_articles)) && break # max 10 items
+            pubdate=$(LC_ALL=C date -r "$i" +"$date_format_json")
+            post_title=$(get_post_title "$i")
+            post_content=$(get_html_file_content 'text' 'entry' $cut_do <"$i" | tr "\"" "'") # write the HTML content into a variable ands replace double quotes with single quotes for valid json
+            echo -n "." 1>&3
+            echo '{'
+            echo '"id": "'$global_url/${i#./}'",'
+            echo '"title": "'$post_title'",'
+            echo '"content_html": "'$post_content'",'
+            echo '"date_published": "'$pubdate'",'
+            echo '"url": "'$global_url/${i#./}'"'
+            echo '}'
+    
+            n=$(( n + 1 ))
+        done < "$tmpfile"
+        rm "$tmpfile"
+    
+        echo ']'
+        echo '}'
+    } 3>&1 >"$jsonfile"
+    echo ""
+
+    mv "$jsonfile" "$feed_json"
+    chmod 644 "$feed_json"
 }
 
 # generate headers, footers, etc
 create_includes() {
-    {
-        echo "<h1 class=\"nomargin\"><a class=\"ablack\" href=\"$global_url/$index_file\">$global_title</a></h1>" 
-        echo "<div id=\"description\">$global_description</div>"
-    } > ".title.html"
+    if [[ -f $title_file ]]; then cp "$title_file" .title.html
+    else {
+        echo "<h1><a href=\"$global_url/$index_file\">$global_title</a></h1>" 
+        echo "<div class=\"description\">$global_description</div>"
+        } > ".title.html"
+    fi
 
     if [[ -f $header_file ]]; then cp "$header_file" .header.html
     else {
@@ -1002,12 +986,10 @@ create_includes() {
         echo '<html><head>'
         echo '<meta charset="UTF-8">'
         echo '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+        echo '<link rel="shortcut icon" href="$favicon">'
         printf '<link rel="stylesheet" href="%s" type="text/css">\n' "${css_include[@]}"
-        if [[ -z $global_feedburner ]]; then
-            echo "<link rel=\"alternate\" type=\"application/rss+xml\" title=\"$template_subscribe_browser_button\" href=\"$blog_feed\">"
-        else 
-            echo "<link rel=\"alternate\" type=\"application/rss+xml\" title=\"$template_subscribe_browser_button\" href=\"$global_feedburner\">"
-        fi
+        echo "<link rel=\"alternate\" type=\"application/rss+xml\" title=\"$template_subscribe_rss_browser_button\" href=\"$feed_rss\">"
+        echo "<link rel=\"alternate\" type=\"application/feed+json\" title=\"$template_subscribe_json_browser_button\" href=\"$feed_json\">"
         } > ".header.html"
     fi
 
@@ -1015,7 +997,7 @@ create_includes() {
     else {
         protected_mail=${global_email//@/&#64;}
         protected_mail=${protected_mail//./&#46;}
-        echo "<div id=\"footer\">$global_license <a href=\"$global_author_url\">$global_author</a> &mdash; <a href=\"mailto:$protected_mail\">$protected_mail</a><br>"
+        echo "<div class=\"credit\">$global_license <a href=\"$global_author_url\">$global_author</a> &ndash; <a href=\"mailto:$protected_mail\">$protected_mail</a><br>"
         echo 'Generated with <a href="https://github.com/cfenollosa/bashblog">bashblog</a>, a single bash script to easily create blogs like this one</div>'
         } >> ".footer.html"
     fi
@@ -1029,47 +1011,10 @@ delete_includes() {
 # Create the css file from scratch
 create_css() {
     # To avoid overwriting manual changes. However it is recommended that
-    # this function is modified if the user changes the blog.css file
-    (( ${#css_include[@]} > 0 )) && return || css_include=('main.css' 'blog.css')
-    if [[ ! -f blog.css ]]; then 
-        # blog.css directives will be loaded after main.css and thus will prevail
-        echo '#title{font-size: x-large;}
-        a.ablack{color:black !important;}
-        li{margin-bottom:8px;}
-        ul,ol{margin-left:24px;margin-right:24px;}
-        #all_posts{margin-top:24px;text-align:center;}
-        .subtitle{font-size:small;margin:12px 0px;}
-        .content p{margin-left:24px;margin-right:24px;}
-        h1{margin-bottom:12px !important;}
-        #description{font-size:large;margin-bottom:12px;}
-        h3{margin-top:42px;margin-bottom:8px;}
-        h4{margin-left:24px;margin-right:24px;}
-        img{max-width:100%;}
-        #twitter{line-height:20px;vertical-align:top;text-align:right;font-style:italic;color:#333;margin-top:24px;font-size:14px;}' > blog.css
-    fi
-
-    # If there is a style.css from the parent page (i.e. some landing page)
-    # then use it. This directive is here for compatibility with my own
-    # home page. Feel free to edit it out, though it doesn't hurt
-    if [[ -f ../style.css ]] && [[ ! -f main.css ]]; then
-        ln -s "../style.css" "main.css" 
-    elif [[ ! -f main.css ]]; then
-        echo 'body{font-family:Georgia,"Times New Roman",Times,serif;margin:0;padding:0;background-color:#F3F3F3;}
-        #divbodyholder{padding:5px;background-color:#DDD;width:100%;max-width:874px;margin:24px auto;}
-        #divbody{border:solid 1px #ccc;background-color:#fff;padding:0px 48px 24px 48px;top:0;}
-        .headerholder{background-color:#f9f9f9;border-top:solid 1px #ccc;border-left:solid 1px #ccc;border-right:solid 1px #ccc;}
-        .header{width:100%;max-width:800px;margin:0px auto;padding-top:24px;padding-bottom:8px;}
-        .content{margin-bottom:5%;}
-        .nomargin{margin:0;}
-        .description{margin-top:10px;border-top:solid 1px #666;padding:10px 0;}
-        h3{font-size:20pt;width:100%;font-weight:bold;margin-top:32px;margin-bottom:0;}
-        .clear{clear:both;}
-        #footer{padding-top:10px;border-top:solid 1px #666;color:#333333;text-align:center;font-size:small;font-family:"Courier New","Courier",monospace;}
-        a{text-decoration:none;color:#003366 !important;}
-        a:visited{text-decoration:none;color:#336699 !important;}
-        blockquote{background-color:#f9f9f9;border-left:solid 4px #e9e9e9;margin-left:12px;padding:12px 12px 12px 24px;}
-        blockquote img{margin:12px 0px;}
-        blockquote iframe{margin:12px 0px;}' > main.css
+    # this function is modified if the user changes the main.css file
+    (( ${#css_include[@]} > 0 )) && return || css_include=('main.css')
+    if [[ ! -f main.css ]]; then
+        echo '*,*:before,*:after{box-sizing:inherit;margin:0;padding:0}::before,::after{text-decoration:inherit;vertical-align:inherit}:where(:root){box-sizing:border-box;-moz-text-size-adjust:none;-webkit-text-size-adjust:none;text-size-adjust:none;background-color:#16161d;font-family:system-ui,ui-sans-serif,sans-serif;position:relative;color:#b5b5b5;min-height:100%}body{position:relative;min-height:100vh;font-size:100%;line-height:1.5;width:100%;margin:0}body>header,body>main,body>footer{background-color:#16161d;max-width:874px;margin-inline:auto;padding-inline:1rem}main{display:block}footer .credit{padding-block:1rem;text-align:center;font-size:small}article{margin-block:2rem}article:first-of-type{margin-block-start:0}article:last-of-type{scroll-margin-block-end:0}article p:not(:last-of-type){margin-block-end:.5rem}article p:last-of-type{font-size:small}article .subtitle{font-size:small;font-style:italic;margin-block-end:.5rem}a,a:visited,a:hover{text-decoration:none;color:#e1e1e1}input,textarea,button{font-size:inherit;font-family:inherit}ul,ol{margin-left:24px;margin-right:24px}h1,h2,h3,h4,h5,h6{color:#e1e1e1}h1{font-size:1.75rem;line-height:1.15;margin-top:2.625rem}h2{font-size:1.5rem;line-height:1.175;margin-top:2.25rem}h3{font-size:1.25rem;line-height:1.2;margin-top:1.874rem}h4{font-size:1.125rem;line-height:1.225;margin-top:1.6875rem}h6{font-size:1rem;line-height:1.25;margin-top:1.5rem}img{max-width:100%}blockquote{border-left:solid 4px #e9e9e9;margin-left:12px;padding:12px 12px 12px 24px}blockquote img{margin:12px 0px}blockquote iframe{margin:12px 0px}.description{font-size:large;margin-bottom:12px}.subnav{margin-block:3rem;text-align:center;font-size:small}.clear{clear:both}' > main.css
     fi
 }
 
@@ -1095,7 +1040,7 @@ rebuild_all_entries() {
         # Read timestamp from file in correct format for 'create_html_page'
         timestamp=$(LC_ALL=C date -r "$i" +"$date_format_full")
 
-        create_html_page "$contentfile" "$i.rebuilt" no "$title" "$timestamp" "$(get_post_author "$i")"
+        create_html_page "$contentfile" "$i.rebuilt" no "$(get_post_title "$i")" "$timestamp" "$(get_post_author "$i")"
         # keep the original timestamp!
         timestamp=$(LC_ALL=C date -r "$i" +"$date_format_timestamp")
         mv "$i.rebuilt" "$i"
@@ -1134,7 +1079,7 @@ reset() {
     echo "Are you sure you want to delete all blog entries? Please write \"Yes, I am!\" "
     read -r line
     if [[ $line == "Yes, I am!" ]]; then
-        rm .*.html ./*.html ./*.css ./*.rss &> /dev/null
+        rm .*.html ./*.html ./*.css ./*.rss ./*.json &> /dev/null
         echo
         echo "Deleted all posts, stylesheets and feeds."
         echo "Kept your old '.backup.tar.gz' just in case, please delete it manually if needed."
@@ -1145,14 +1090,14 @@ reset() {
 
 # Detects if GNU date is installed
 date_version_detect() {
-	date --version >/dev/null 2>&1
-	if (($? != 0));  then
-		# date utility is BSD. Test if gdate is installed 
-		if gdate --version >/dev/null 2>&1 ; then
+  date --version >/dev/null 2>&1
+  if (($? != 0));  then
+    # date utility is BSD. Test if gdate is installed 
+    if gdate --version >/dev/null 2>&1 ; then
             date() {
                 gdate "$@"
             }
-		else
+    else
             # BSD date
             date() {
                 if [[ $1 == -r ]]; then
@@ -1217,16 +1162,17 @@ do_main() {
     # Test for existing html files
     if ls ./*.html &> /dev/null; then
         # We're going to back up just in case
-        tar -c -z -f ".backup.tar.gz" -- *.html &&
-            chmod 600 ".backup.tar.gz"
+        mkdir -p "backups/"
+        tar -c -z -f "backups/.backup.tar.gz" -- *.html &&
+            chmod 600 "backups/.backup.tar.gz"
     elif [[ $1 == rebuild ]]; then
         echo "Can't find any html files, nothing to rebuild"
         exit
     fi
 
     # Keep first backup of this day containing yesterday's version of the blog
-    [[ ! -f .yesterday.tar.gz || $(date -r .yesterday.tar.gz +'%d') != "$(date +'%d')" ]] &&
-        cp .backup.tar.gz .yesterday.tar.gz &> /dev/null
+    [[ ! -f backups/.yesterday.tar.gz || $(date -r backups/.yesterday.tar.gz +'%d') != "$(date +'%d')" ]] &&
+        cp backups/.backup.tar.gz backups/.yesterday.tar.gz &> /dev/null
 
     [[ $1 == reset ]] &&
         reset && exit
@@ -1249,6 +1195,7 @@ do_main() {
     all_posts
     all_tags
     make_rss
+    make_json
     make_sitemap
     delete_includes
 }
